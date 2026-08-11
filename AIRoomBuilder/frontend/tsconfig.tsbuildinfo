@@ -1,0 +1,1 @@
+{"root":["./src/env.d.ts","./src/main.ts","./src/api/index.ts","./src/assets/demoscene.ts","./src/stores/workspace.ts","./src/three/roomrenderer.ts","./src/three/primitives.ts","./src/types/scene.ts","./src/app.vue","./src/components/scenecanvas.vue","./vite.config.ts"],"version":"5.7.3"}
