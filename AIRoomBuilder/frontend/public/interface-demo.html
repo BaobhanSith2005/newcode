@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Room Builder · 后端接口对接 Demo</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2328; background: #f6f8fa; margin: 0; padding: 24px; line-height: 1.6; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    h2 { font-size: 16px; margin: 24px 0 8px; border-left: 4px solid #2f6feb; padding-left: 8px; }
+    .note { background: #fff8e6; border: 1px solid #ffe58f; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #614700; }
+    .note code { background: #fff3cd; padding: 1px 5px; border-radius: 4px; }
+    .card { background: #fff; border: 1px solid #e1e4e8; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    label { display: block; font-size: 12px; color: #57606a; margin: 8px 0 2px; }
+    input[type=text], input[type=number], textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d0d7de; border-radius: 6px; font-size: 13px; }
+    textarea { height: 90px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+    button { background: #2f6feb; color: #fff; border: none; border-radius: 6px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+    button:hover { background: #1f5fd6; }
+    button.alt { background: #6e7781; }
+    button.alt:hover { background: #57606a; }
+    button.flow { background: #1a7f37; }
+    button.flow:hover { background: #15722f; }
+    pre { background: #0d1117; color: #c9d1d9; border-radius: 8px; padding: 14px; font-size: 12.5px; overflow: auto; max-height: 420px; white-space: pre-wrap; word-break: break-all; }
+    .grp { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>AI Room Builder · 后端接口对接 Demo</h1>
+
+  <div class="note">
+    <b>运行方式（重要）</b><br />
+    本页面用原生 <code>XMLHttpRequest</code> 调用后端，<b>不依赖 jQuery、不封装任何请求库</b>，每个接口都是一段独立的过程式代码。<br />
+    后端 CORS 仅放行 <code>http://localhost:5173</code>，推荐运行方式：把本目录两个文件复制到
+    <code>frontend/public/</code>，启动前端（<code>npm run dev</code>）后访问
+    <code>http://localhost:5173/api-demo.html</code>，并把下方「API 基础地址」设为 <code>/api</code>（默认值）。<br />
+    若直接双击打开（<code>file://</code>），会因跨域被拦截；此时可临时把后端 <code>main.py</code> 的
+    CORS <code>allow_origins</code> 改为 <code>["*"]</code>，并把下方地址设为 <code>http://127.0.0.1:8000/api</code>。
+  </div>
+
+  <div class="card">
+    <h2>基础配置</h2>
+    <div class="grid">
+      <div>
+        <label>API 基础地址</label>
+        <input type="text" id="apiBase" value="/api" />
+      </div>
+      <div>
+        <label>项目名称（创建项目用）</label>
+        <input type="text" id="projectName" placeholder="未命名项目" />
+      </div>
+      <div>
+        <label>projectId（项目 ID）</label>
+        <input type="number" id="projectId" placeholder="例如 1" />
+      </div>
+      <div>
+        <label>imageId（图片 ID）</label>
+        <input type="number" id="imageId" placeholder="例如 1" />
+      </div>
+      <div>
+        <label>sceneId（场景 ID）</label>
+        <input type="number" id="sceneId" placeholder="例如 1" />
+      </div>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div>
+        <label>上传图片文件</label>
+        <input type="file" id="imageFile" accept="image/*" />
+      </div>
+      <div>
+        <label>房间宽覆盖 width（米，可选）</label>
+        <input type="text" id="roomW" placeholder="留空=不覆盖" />
+      </div>
+      <div>
+        <label>房间深覆盖 depth（米，可选）</label>
+        <input type="text" id="roomD" placeholder="留空=不覆盖" />
+      </div>
+      <div>
+        <label>房间高覆盖 height（米，可选）</label>
+        <input type="text" id="roomH" placeholder="留空=不覆盖" />
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <label>更新场景用的 scene.json（PUT 场景时填写完整 JSON）</label>
+      <textarea id="sceneJson" placeholder='{"room":{"type":"living_room","width":5,"depth":4,"height":2.8},"objects":[]}'></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>接口调用（点击即发请求）</h2>
+
+    <div class="grp"><b>健康检查 / 项目</b></div>
+    <div class="btns" style="margin-top:6px">
+      <button onclick="apiHealth()">GET /api/health</button>
+      <button onclick="apiCreateProject()">POST /api/projects</button>
+      <button onclick="apiListProjects()">GET /api/projects</button>
+      <button onclick="apiGetProject()">GET /api/projects/{id}</button>
+      <button class="alt" onclick="apiDeleteProject()">DELETE /api/projects/{id}</button>
+    </div>
+
+    <div class="grp"><b>图片上传与分析</b></div>
+    <div class="btns" style="margin-top:6px">
+      <button onclick="apiUploadImage()">POST /api/images/upload</button>
+      <button onclick="apiListImages()">GET /api/images</button>
+      <button onclick="apiGetAnalysis()">GET /api/images/{id}/analysis</button>
+      <button class="alt" onclick="apiReanalyze()">POST /api/images/{id}/reanalyze</button>
+    </div>
+
+    <div class="grp"><b>场景生成与查询</b></div>
+    <div class="btns" style="margin-top:6px">
+      <button onclick="apiGenerateScene()">POST /api/scenes/generate</button>
+      <button onclick="apiListScenes()">GET /api/scenes</button>
+      <button onclick="apiGetScene()">GET /api/scenes/{id}</button>
+      <button class="alt" onclick="apiUpdateScene()">PUT /api/scenes/{id}</button>
+    </div>
+
+    <div class="grp"><b>元数据</b></div>
+    <div class="btns" style="margin-top:6px">
+      <button onclick="apiGetCatalog()">GET /api/scenes/meta/catalog</button>
+    </div>
+
+    <div class="grp" style="margin-top:14px"><b>端到端串联示例</b></div>
+    <div class="btns" style="margin-top:6px">
+      <button class="flow" onclick="runDemoFlow()">一键跑通流程（需先选图片）</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>返回结果</h2>
+    <pre id="result">点击上方按钮，返回内容会显示在这里。</pre>
+  </div>
+
+  <script src="interface-demo.js"></script>
+</body>
+</html>

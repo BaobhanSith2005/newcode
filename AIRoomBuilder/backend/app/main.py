@@ -66,7 +66,7 @@ app.mount("/models", StaticFiles(directory=MODELS_DIR), name="models")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
-@app.get("/api/health", tags=["health"], summary="健康检查",
+@app.get("/api/health", tags=["health"], summary="健康检哈",
          description="返回服务可用性与当前生效的视觉模型配置（provider 与具体模型名）。")
 def health():
     return {

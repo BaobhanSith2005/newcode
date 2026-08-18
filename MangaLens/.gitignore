@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+.env
+
+# 后端运行时数据（数据库、上传图片、VLM 缓存）
+backend/data/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
