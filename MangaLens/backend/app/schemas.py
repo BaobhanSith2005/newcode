@@ -18,7 +18,9 @@ class TranslateText(BaseModel):
 class BatchCreate(BaseModel):
     """创建批次时前端发来的数据 —— 同款见 AIRoomBuilder schemas.py 第7-8行 ProjectCreate"""
     name: str = Field(default="未命名批次", max_length=200,
-                      description="批次名称，比如书名。同一批次的书页图会合成一个txt。")
+                      description="批次名称，比如书名/漫画名。")
+    kind: str = Field(default="novel", pattern="^(novel|manga)$",
+                      description="板块：novel=小说书页（合成txt）/ manga=漫画图（批量嵌字成品）")
 
 
 class BatchOut(BaseModel):
@@ -26,6 +28,7 @@ class BatchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int = Field(description="批次唯一 ID")
     name: str = Field(description="批次名称")
+    kind: str = Field(description="板块：novel 小说 / manga 漫画")
     created_at: datetime = Field(description="创建时间（ISO-8601, UTC）")
 
 
@@ -38,11 +41,18 @@ class ImageOut(BaseModel):
     order: int = Field(default=0, description="批次内的排序号（第几张）")
     status: str = Field(description="处理状态：pending → running → done / failed")
     error: str | None = Field(default=None, description="失败时的错误信息")
+    progress: str | None = Field(
+        default=None,
+        description="任务进行到哪一步的中文提示（如：② 云端翻译中…）。"
+                    "running 时看它就知道后台在干嘛；done=完成，failed=失败",
+    )
     result: dict[str, Any] | None = Field(
         default=None,
         description="翻译结果：status=done 时非空，含 texts[] 列表",
     )
     style: str = Field(description="翻译风格")
+    # rendered_path 故意不放出来 —— 同款 DocOut 的原则：服务器文件路径是内部信息，
+    # 前端看 status=done 且 batch_id 为空（漫画图）就知道成品好了，调 render/download 下载
     created_at: datetime = Field(description="上传时间（ISO-8601, UTC）")
 
     @field_validator("result", mode="before")
@@ -54,4 +64,18 @@ class ImageOut(BaseModel):
         if isinstance(v, str):
             return json.loads(v) if v else None
         return v
+
+
+class DocOut(BaseModel):
+    """返回给前端的文本文件翻译任务（小说 txt/epub）。
+    注意：path / out_path 故意不放出来——服务器上的文件路径是内部信息，
+    前端只需要知道文件名和下载接口，不需要知道文件在服务器哪个角落。"""
+    model_config = ConfigDict(from_attributes=True)
+    id: int = Field(description="文档任务唯一 ID")
+    filename: str = Field(description="上传时的原始文件名")
+    file_type: str = Field(description="文件类型：txt（epub 下一阶段）")
+    status: str = Field(description="处理状态：pending → running → done / failed")
+    error: str | None = Field(default=None, description="失败时的错误信息")
+    style: str = Field(description="翻译风格（默认文学风）")
+    created_at: datetime = Field(description="上传时间（ISO-8601, UTC）")
 

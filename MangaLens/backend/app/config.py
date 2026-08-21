@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://apihub.agnes-ai.cn/v1"
     openai_model: str = "agnes-2.0-flash"
 
+    # 擦除模式：lama = LaMa 模型擦除（正式效果，默认——第一版同款）；
+    #          white = 白板涂白（跳过 LaMa，几毫秒完事，测试定位提速用）。
+    # 想测定位时再在 .env 加一行 ERASE_MODE=white
+    erase_mode: str = "lama"
+
     def resolved_provider(self) -> str:
         """没有配置 Key 时自动回退 mock，保证项目开箱即跑。
         同款见 AIRoomBuilder/backend/app/config.py 第37-47行。"""

@@ -1,8 +1,14 @@
 """批次接口 —— 同款见 AIRoomBuilder/backend/app/api/projects.py。
 
-小说板块：一个批次 = 一本要翻译的书。
+一个批次服务一个板块（Batch.kind）：
+  novel 小说：一批书页图 → 合成一个对照txt
+  manga 漫画：一批漫画图 → 批量嵌字，整批成品打包zip
 """
+import io
 import json
+import zipfile
+from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -17,10 +23,11 @@ router = APIRouter(prefix="/api/batches", tags=["batches"])
 
 
 @router.post("", response_model=BatchOut, summary="创建批次",
-             description="新建一个小说翻译批次。之后上传书页图时带上批次ID。")
+             description="新建一个翻译批次。kind=novel 小说书页 / manga 漫画图。"
+                         "之后上传图片时带上批次ID。")
 def create_batch(payload: BatchCreate, db: Session = Depends(get_db)):
     """同款见 AIRoomBuilder projects.py 第12-19行 create_project"""
-    batch = Batch(name=payload.name)
+    batch = Batch(name=payload.name, kind=payload.kind)
     db.add(batch)
     db.commit()
     db.refresh(batch)
@@ -46,7 +53,7 @@ def get_batch(batch_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{batch_id}/images", response_model=list[ImageOut], summary="批次图片列表",
-            description="返回批次下的全部书页图，按 order 从小到大（页码顺序）。")
+            description="返回批次下的全部图片，按 order 从小到大（页码顺序）。")
 def list_batch_images(batch_id: int, db: Session = Depends(get_db)):
     """同款见 AIRoomBuilder images.py 第95-100行 list_images，
     区别：那里按 id 倒序，这里按 order 升序——合成 txt 的页码顺序靠它。
@@ -68,12 +75,14 @@ def delete_batch(batch_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
-@router.get("/{batch_id}/download", summary="下载整批合成txt",
-            description="把批次内全部书页按 order 顺序拼成一个对照txt。",
+@router.get("/{batch_id}/download", summary="下载整批结果",
+            description="小说批次：全部书页按 order 拼成对照txt；"
+                        "漫画批次：全部成品图打包成 zip。",
             responses={404: {"description": "批次不存在"},
-                       409: {"description": "批次为空或还有图片没翻译完"}})
+                       409: {"description": "批次为空或还有图片没处理完"}})
 def download_batch(batch_id: int, db: Session = Depends(get_db)):
-    """整批下载 —— 用到的全是旧技能：排序、409、Response、dumps/loads。"""
+    """整批下载 —— 用到的全是旧技能：排序、409、Response、dumps/loads。
+    漫画分支的新技能：zipfile 打压缩包 + filename* 中文文件名。"""
     batch = db.get(Batch, batch_id)
     if not batch:
         raise HTTPException(404, "批次不存在")
@@ -84,6 +93,27 @@ def download_batch(batch_id: int, db: Session = Depends(get_db)):
     if not images:
         raise HTTPException(409, "批次里还没有图片")
 
+    # ---- 漫画批次：全部嵌字成品按 order 打包 zip（调序后重新下载，顺序也变）----
+    if batch.kind == "manga":
+        not_done = [i for i in images if i.status != "done" or not i.rendered_path]
+        if not_done:
+            raise HTTPException(409, f"还有 {len(not_done)} 张没嵌字完，全部完成后再下载")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for page_no, img in enumerate(images, start=1):
+                stem = Path(img.filename).stem
+                # 三位数页码前缀：zip 里按顺序排好，解压就是阅读顺序
+                zf.write(img.rendered_path, arcname=f"{page_no:03d}_{stem}.png")
+        filename = f"{batch.name}_成品图.zip"
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/zip",
+            # filename*=UTF-8''... 写法 = 让中文文件名在下载框里不乱码
+            headers={"Content-Disposition":
+                     f"attachment; filename*=UTF-8''{quote(filename, safe='')}"},
+        )
+
+    # ---- 小说批次：老逻辑 ----
     # 全部翻译完才给下载，否则 txt 里会有洞
     not_done = [i for i in images if i.status != "done" or not i.result]
     if not_done:
@@ -109,7 +139,7 @@ def download_batch(batch_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{batch_id}/images/{image_id}/move", response_model=list[ImageOut],
-             summary="调整书页顺序",
+             summary="调整批次内图片顺序",
              description="把某张图在批次内上移/下移一位，返回调整后的完整顺序。")
 def move_image(batch_id: int, image_id: int, direction: str = Query("up"),
                db: Session = Depends(get_db)):

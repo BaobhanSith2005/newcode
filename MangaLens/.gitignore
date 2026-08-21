@@ -7,6 +7,10 @@ __pycache__/
 # 后端运行时数据（数据库、上传图片、VLM 缓存）
 backend/data/
 
+# 模型文件（lama.onnx 有 100MB+，超过 GitHub 单文件 100MB 限制；
+# 且模型按 README 教程自行下载，不需要入库）
+backend/models/
+
 # Node
 node_modules/
 frontend/dist/
